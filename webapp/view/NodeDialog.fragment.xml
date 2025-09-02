@@ -1,0 +1,16 @@
+<core:FragmentDefinition
+    xmlns="sap.m"
+    xmlns:core="sap.ui.core">
+    <Dialog
+        id="nodeDialog"
+        title="Node Information"
+        draggable="true"
+        resizable="true">
+        <content>
+            <Text id="nodeText" text="Node details will appear here."/>
+        </content>
+        <endButton>
+            <Button text="Close" press="onCloseDialog"/>
+        </endButton>
+    </Dialog>
+</core:FragmentDefinition>
