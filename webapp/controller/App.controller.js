@@ -4,17 +4,20 @@ sap.ui.define([
     "sap/m/VBox",
     "sap/m/Input",
     "sap/m/HBox",
-    "sap/ui/core/HTML"
-], function (Controller, Button, VBox, Input, HBox, HTML) {
+    "sap/ui/core/HTML",
+    "sap/ui/core/Fragment"
+], function (Controller, Button, VBox, Input, HBox, HTML, Fragment) {
     "use strict";
 
-    return Controller.extend("myApp.controller.Main", {
+    return Controller.extend("ui5.walkthrough.controller.App", {
+
         onInit: function () {
+
             var oVBox = this.getView().byId("graphBox");
 
             // SVG for edges
             var oEdgeHTML = new HTML({
-                content: '<svg id="graphEdges" width="500" height="400" style="position:absolute; top:0; left:0;">' +
+                content: '<svg id="graphEdges" width="100%" height="600" style="position:absolute; top:0; left:0;">' +
                          '<defs>' +
                          '<marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto">' +
                          '<path d="M0,0 L10,5 L0,10 Z" fill="black" />' +
@@ -24,26 +27,56 @@ sap.ui.define([
             });
             oVBox.addItem(oEdgeHTML);
 
+            // Fixed node layout
+            var layout = {
+                node0: { x: 100, y: 200 },  
+                node1: { x: 300, y: 150 },  
+                node2: { x: 500, y: 100 },  
+                node3: { x: 300, y: 250 },  
+                node4: { x: 700, y: 150 },  
+                node5: { x: 900, y: 150 }   
+            };
+
             // Node data
             var nodes = [
-                { id: "node1", label: "A" },
-                { id: "node2", label: "B" },
-                { id: "node3", label: "C" },
-                { id: "node4", label: "D" }
+                { id: "node0", label: "Utworzone", description:"lorem ipsum" },
+                { id: "node1", label: "Akceptacja", description:"lorem ipsum"},
+                { id: "node2", label: "Zatwierdzone", description:"lorem ipsum" },
+                { id: "node3", label: "Odrzucone", description:"lorem ipsum"},
+                { id: "node4", label: "Wysłane", description:"lorem ipsum"},
+                { id: "node5", label: "Zakończone", description:"lorem ipsum"}
             ];
 
             // Edge data
-            var edges = [[0,1],[1,2],[2,0],[0,3]];
+            var edges = [[0,1],[0,3],[1,2],[1,3],[2,4],[4,5]];
+
+            // Helper: intersect line with rectangle (button)
+            function intersectRect(cx, cy, w, h, dx, dy) {
+                const halfW = w/2, halfH = h/2;
+                let tX = dx !== 0 ? halfW / Math.abs(dx) : Infinity;
+                let tY = dy !== 0 ? halfH / Math.abs(dy) : Infinity;
+                const t = Math.min(tX, tY);
+                return { x: cx + dx * t, y: cy + dy * t };
+            }
 
             // Create buttons as nodes
-            nodes.forEach(function(node){
-                var oButton = new Button({ 
-					text: node.label,
-					press: ".onOpenDialog"
-				}).addStyleClass("circleButton");
+            nodes.forEach((node) => {
+                var oButton = new Button({
+                    text: node.label,
+                    press: async () => {
+                        this.oDialog ??= await this.loadFragment({
+                            name: "ui5.walkthrough.view.HelloDialog"
+                        });
+                        const oText = this.oDialog.getContent()[1];
+                        oText.setText(node.description);
+                        this.oDialog.open();
+                    }
+                });
+
                 node.button = oButton;
-                node.x = Math.random()*400 + 50;
-                node.y = Math.random()*300 + 50;
+                node.x = layout[node.id].x;
+                node.y = layout[node.id].y;
+
                 oVBox.addItem(oButton);
 
                 // Dragging
@@ -72,6 +105,7 @@ sap.ui.define([
             });
 
             function updatePositions(){
+                // Update button positions
                 nodes.forEach(function(node){
                     var dom = node.button.getDomRef();
                     if(dom){
@@ -81,87 +115,75 @@ sap.ui.define([
                     }
                 });
 
-                if(svg){
-                    svg.innerHTML = '<defs>' +
-                                    '<marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto">' +
-                                    '<path d="M0,0 L10,5 L0,10 Z" fill="black" />' +
-                                    '</marker>' +
-                                    '</defs>';
-  var lineElements = [];
+                if(!svg) return;
+                svg.innerHTML = '<defs>' +
+                                '<marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto">' +
+                                '<path d="M0,0 L10,5 L0,10 Z" fill="black" />' +
+                                '</marker>' +
+                                '</defs>';
 
-edges.forEach(function(e, idx){
-    var n1 = nodes[e[0]], n2 = nodes[e[1]];
+                var lineElements = [];
 
-    var w1 = n1.button.getDomRef().offsetWidth;
-    var h1 = n1.button.getDomRef().offsetHeight;
-    var w2 = n2.button.getDomRef().offsetWidth;
-    var h2 = n2.button.getDomRef().offsetHeight;
+                edges.forEach(function(e, idx){
+                    var n1 = nodes[e[0]], n2 = nodes[e[1]];
 
-    var x1c = n1.x + w1/2;
-    var y1c = n1.y + h1/2;
-    var x2c = n2.x + w2/2;
-    var y2c = n2.y + h2/2;
+                    var w1 = n1.button.getDomRef().offsetWidth;
+                    var h1 = n1.button.getDomRef().offsetHeight;
+                    var w2 = n2.button.getDomRef().offsetWidth;
+                    var h2 = n2.button.getDomRef().offsetHeight;
 
-    var dx = x2c - x1c;
-    var dy = y2c - y1c;
-    var dist = Math.sqrt(dx*dx + dy*dy) || 1;
-    var ux = dx/dist, uy = dy/dist;
+                    var x1c = n1.x + w1/2;
+                    var y1c = n1.y + h1/2;
+                    var x2c = n2.x + w2/2;
+                    var y2c = n2.y + h2/2;
 
-    var r1 = Math.min(w1, h1)/2;
-    var r2 = Math.min(w2, h2)/2;
+                    var dx = x2c - x1c;
+                    var dy = y2c - y1c;
 
-    var x1 = x1c + ux*r1;
-    var y1 = y1c + uy*r1;
-    var x2 = x2c - ux*r2;
-    var y2 = y2c - uy*r2;
+                    var start = intersectRect(x1c, y1c, w1, h1, dx, dy);
+                    var end   = intersectRect(x2c, y2c, w2, h2, -dx, -dy);
 
-    // Unique marker for each line
-    var markerId = "arrow" + idx;
-    var defs = svg.querySelector("defs");
-    var marker = document.createElementNS("http://www.w3.org/2000/svg","marker");
-    marker.setAttribute("id", markerId);
-    marker.setAttribute("markerWidth", "10");
-    marker.setAttribute("markerHeight", "10");
-    marker.setAttribute("refX", "10");
-    marker.setAttribute("refY", "5");
-    marker.setAttribute("orient", "auto");
-    var path = document.createElementNS("http://www.w3.org/2000/svg","path");
-    path.setAttribute("d","M0,0 L10,5 L0,10 Z");
-    path.setAttribute("fill","black");
-    marker.appendChild(path);
-    defs.appendChild(marker);
+                    // Unique marker for each line
+                    var markerId = "arrow" + idx;
+                    var defs = svg.querySelector("defs");
+                    var marker = document.createElementNS("http://www.w3.org/2000/svg","marker");
+                    marker.setAttribute("id", markerId);
+                    marker.setAttribute("markerWidth", "10");
+                    marker.setAttribute("markerHeight", "10");
+                    marker.setAttribute("refX", "10");
+                    marker.setAttribute("refY", "5");
+                    marker.setAttribute("orient", "auto");
+                    var path = document.createElementNS("http://www.w3.org/2000/svg","path");
+                    path.setAttribute("d","M0,0 L10,5 L0,10 Z");
+                    path.setAttribute("fill","black");
+                    marker.appendChild(path);
+                    defs.appendChild(marker);
 
-    var line = document.createElementNS("http://www.w3.org/2000/svg","line");
-    line.setAttribute("x1", x1);
-    line.setAttribute("y1", y1);
-    line.setAttribute("x2", x2);
-    line.setAttribute("y2", y2);
-    line.setAttribute("stroke","black");
-    line.setAttribute("stroke-width","2");
-    line.setAttribute("marker-end","url(#" + markerId + ")");
+                    var line = document.createElementNS("http://www.w3.org/2000/svg","line");
+                    line.setAttribute("x1", start.x);
+                    line.setAttribute("y1", start.y);
+                    line.setAttribute("x2", end.x);
+                    line.setAttribute("y2", end.y);
+                    line.setAttribute("stroke","black");
+                    line.setAttribute("stroke-width","3");
+                    line.setAttribute("marker-end","url(#" + markerId + ")");
 
-    // Add click listener
-    line.addEventListener("click", function(){
-        // Reset all lines to black
-        lineElements.forEach(function(le){
-            le.line.setAttribute("stroke","black");
-            le.path.setAttribute("fill","black");
-        });
+                    // Click listener to highlight line
+                    line.addEventListener("click", function(){
+                        lineElements.forEach(function(le){
+                            le.line.setAttribute("stroke","black");
+                            le.path.setAttribute("fill","black");
+                        });
+                        line.setAttribute("stroke","blue");
+                        path.setAttribute("fill","blue");
+                    });
 
-        // Highlight clicked line
-        line.setAttribute("stroke","blue");
-        path.setAttribute("fill","blue");
-    });
-
-    svg.appendChild(line);
-
-    // Keep reference for later reset
-    lineElements.push({ line: line, path: path });
-});
-                }
+                    svg.appendChild(line);
+                    lineElements.push({ line: line, path: path });
+                });
             }
 
-            // Input fields for adding new edges
+            // Input fields for adding/deleting connections
             var inputSource = new Input({ placeholder: "Source Node Label" });
             var inputTarget = new Input({ placeholder: "Target Node Label" });
             var addButton = new Button({
@@ -172,37 +194,55 @@ edges.forEach(function(e, idx){
                     if(!srcLabel || !tgtLabel) return;
                     var srcIndex = nodes.findIndex(n => n.label === srcLabel);
                     var tgtIndex = nodes.findIndex(n => n.label === tgtLabel);
-                    if(srcIndex !== -1 && tgtIndex !== -1){
+                    if(JSON.stringify(edges).includes(JSON.stringify([srcIndex, tgtIndex]))){
+                        alert("This edge already exists");
+                    }
+                    else if(srcIndex !== -1 && tgtIndex !== -1){
                         edges.push([srcIndex, tgtIndex]);
                         updatePositions();
-                    } else {
-                        alert("Invalid node labels");
-                    }
+                    } else { alert("Invalid node labels"); }
+                }
+            });
+            var deleteButton = new Button({
+                text: "Delete Connection",
+                press: function(){
+                    var srcLabel = inputSource.getValue().trim();
+                    var tgtLabel = inputTarget.getValue().trim();
+                    if(!srcLabel || !tgtLabel) return;
+                    var srcIndex = nodes.findIndex(n => n.label === srcLabel);
+                    var tgtIndex = nodes.findIndex(n => n.label === tgtLabel);
+                    if(JSON.stringify(edges).includes(JSON.stringify([srcIndex, tgtIndex]))){
+                        edges.forEach((edge, index) => {
+                            if(edge[0] === srcIndex && edge[1] === tgtIndex){
+                                edges.splice(index, 1);
+                            }
+                        });
+                        updatePositions();
+                    } else if(srcIndex !== -1 && tgtIndex !== -1){
+                        alert("This connection doesn't exist")
+                    } else { alert("Invalid node labels"); }
                 }
             });
 
-            // Input for searching/highlighting a node
+            // Input for highlighting node
             var inputSearch = new Input({ placeholder: "Search Node Label" });
             var searchButton = new Button({
                 text: "Highlight Node",
                 press: function(){
                     var searchLabel = inputSearch.getValue().trim();
                     nodes.forEach(function(n){
-                        var dom = n.button.getDomRef();
-                        if(dom){
-                            if(n.label === searchLabel){
-                                dom.style.backgroundColor = "#FF9800"; // highlight color
-                            } 
-							else{
-								dom.style.backgroundColor = "white";
-							}
+                        if (n.label === searchLabel) {
+                            n.button.setType("Success"); // Highlight
+                        } else {
+                            n.button.setType("Default");  // Reset others
                         }
                     });
+                    setTimeout(updatePositions, 0);
                 }
             });
 
             var inputBox = new HBox({
-                items: [inputSource, inputTarget, addButton, inputSearch, searchButton],
+                items: [inputSource, inputTarget, addButton, deleteButton, inputSearch, searchButton],
                 justifyContent:"Center",
                 alignItems:"Center",
                 width:"100%",
@@ -211,39 +251,17 @@ edges.forEach(function(e, idx){
             });
             oVBox.addItem(inputBox);
         },
-		 _openNodeDialog: function(nodeLabel) {
-            if (!this._oDialog) {
-                Fragment.load({
-                    id: this.getView().getId(),
-                    name: "ui5.walkthrough.view.NodeDialog",
-                    controller: this
-                }).then(function(oDialog) {
-                    this._oDialog = oDialog;
-                    this.getView().addDependent(this._oDialog);
-                    this._showDialog(nodeLabel);
-                }.bind(this));
-            } else {
-                this._showDialog(nodeLabel);
-            }
+
+        async onDialogOpen() {
+            this.oDialog ??= await this.loadFragment({
+                name: "ui5.walkthrough.view.HelloDialog"
+            });
+            this.oDialog.open();
         },
 
-        _showDialog: function(nodeLabel) {
-            var oText = this._oDialog.getContent()[0]; // the Text control
-            oText.setText("You clicked node: " + nodeLabel);
-            this._oDialog.open();
-        },
-
-		async onOpenDialog() {
-			this.oDialog ??= await this.loadFragment({
-				name: "ui5.walkthrough.view.NodeDialog"
-			});
-			this.oDialog.open();
-		},
-
-        onCloseDialog: function() {
-            if (this._oDialog) {
-                this._oDialog.close();
-            }
+        onCloseDialog() {
+            this.byId("helloDialog").close();
         }
+
     });
 });

@@ -1,16 +1,5 @@
-.circleButton {
-    border-radius: 50%;
-    width: 60px;
-    height: 60px;
-    padding: 0;
-    text-align: center;
-    font-weight: bold;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    cursor: pointer;
-}
-
-.circleButton:hover {
-    background-color: #45a049;
+.graphContainer {
+    width: 100%;
+    height: 100%;
+    position: relative;
 }

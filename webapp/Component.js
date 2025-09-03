@@ -11,17 +11,12 @@ sap.ui.define([
 		},
 
 		init() {
-			// call the init function of the parent
+			// call parent init
 			UIComponent.prototype.init.apply(this, arguments);
 
-			// set data model on view
-			const oData = {
-				recipient: {
-					name: "World"
-				}
-			};
-			const oModel = new JSONModel(oData);
-			this.setModel(oModel);
+			// optional: log the nodeModel (will be undefined if OData 401 occurs)
+			const oModel = this.getModel("nodeModel");
+			console.log(oModel);
 		}
 	});
 });
