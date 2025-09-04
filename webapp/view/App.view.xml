@@ -2,12 +2,14 @@
 	controllerName="ui5.walkthrough.controller.App"
 	xmlns="sap.m"
 	xmlns:mvc="sap.ui.core.mvc"
+	xmlns:core="sap.ui.core"
 	displayBlock="true"
 >
 	<Shell>
 		<App>
 			<pages>
 				<Page title="{i18n>homePageTitle}">
+					 
 					<content>
 						<VBox id="graphBox" class="graphContainer" />
 					</content>

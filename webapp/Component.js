@@ -1,7 +1,8 @@
 sap.ui.define([
 	"sap/ui/core/UIComponent",
-	"sap/ui/model/json/JSONModel"
-], (UIComponent, JSONModel) => {
+	"sap/ui/model/json/JSONModel",
+	"sap/ui/model/odata/v4/ODataModel"
+], (UIComponent, JSONModel, ODataModel) => {
 	"use strict";
 
 	return UIComponent.extend("ui5.walkthrough.Component", {
@@ -14,9 +15,14 @@ sap.ui.define([
 			// call parent init
 			UIComponent.prototype.init.apply(this, arguments);
 
-			// optional: log the nodeModel (will be undefined if OData 401 occurs)
-			const oModel = this.getModel("nodeModel");
-			console.log(oModel);
+			const oNodeModel = new ODataModel({
+                serviceUrl: "/sap/opu/odata4/sap/zkc_node_ui_v4/srvd_a2x/sap/zkc_node_ui/0001/",
+                synchronizationMode: "None"
+            });
+			 this.setModel(oNodeModel, "nodeModel");
+
+
+
 		}
 	});
 });

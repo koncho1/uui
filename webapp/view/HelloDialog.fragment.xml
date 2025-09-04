@@ -4,15 +4,18 @@
 >
 	<Dialog
 		id="helloDialog"
-		title="Hello"
+		title="{i18n>dialogTitleText}"
+		contentWidth="400px"
+    	contentHeight="280px"
+
 	>
 		<content>
 			<core:Icon
-				src="sap-icon://hello-world"
+				src="sap-icon://information"
 				size="8rem"
 				class="sapUiMediumMargin"
 			/>
-			<Text id="description"/>
+			<Text id="description" width="40%" class="sapUiSmallMarginTop"/>
 		</content>
 		<beginButton>
 			<Button

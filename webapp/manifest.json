@@ -10,7 +10,14 @@
     "title": "{{appTitle}}",
     "description": "{{appDescription}}",
     "type": "application",
-    "applicationVersion": { "version": "1.0.0" }
+    "applicationVersion": { "version": "1.0.0" },
+    "dataSources": {
+    "mainService": {
+      "uri": "/sap/opu/odata4/sap/zkc_node_ui_v4/srvd_a2x/sap/zkc_node_ui/0001/",
+      "type": "OData",
+      "settings": { "odataVersion": "4.0" }
+    }
+  }
   },
   "sap.ui": {
     "technology": "UI5",
@@ -41,13 +48,6 @@
       "viewName": "ui5.walkthrough.view.App",
       "type": "XML",
       "id": "app"
-    }
-  },
-  "dataSources": {
-    "mainService": {
-      "uri": "https://hana.sygeon.com:5200/sap/opu/odata4/sap/zkc_node_ui_v4/srvd_a2x/sap/zkc_node_ui/0001?sap-client=100",
-      "type": "OData",
-      "settings": { "odataVersion": "4.0" }
     }
   }
 }

@@ -8,6 +8,7 @@
     "start": "ui5 serve -o index.html"
   },
   "devDependencies": {
-    "@ui5/cli": "^4"
+    "@ui5/cli": "^4",
+    "ui5-middleware-simpleproxy": "^3.4.3"
   }
 }
