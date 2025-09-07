@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "author": "SAP SE",
-  "description": "UI5 Demo App - Walkthrough Tutorial",
+  "description": "Graph app",
   "scripts": {
     "start": "ui5 serve -o index.html"
   },
