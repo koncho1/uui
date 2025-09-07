@@ -5,28 +5,34 @@ sap.ui.define([
     "sap/m/Input",
     "sap/m/HBox",
     "sap/ui/core/HTML",
-    "sap/ui/core/Fragment"
-], function (Controller, Button, VBox, Input, HBox, HTML, Fragment) {
+    "sap/m/MessageBox",
+    "sap/m/MessageToast"
+], function (Controller, Button, VBox, Input, HBox, HTML, MessageBox, MessageToast) {
     "use strict";
 
     return Controller.extend("ui5.walkthrough.controller.App", {
 
         onInit: async function () {
+
+            const nodes = [
+                { ZLabel: "Utworzone", Description: "abc" },
+                { ZLabel: "B", Description: "bc" },
+                { ZLabel: "C", Description: "aa" }
+            ];
+            const edges = [[0, 1]];
+
             const oVBox = this.getView().byId("graphBox");
 
-            // SVG for edges
+            // SVG container
             const oEdgeHTML = new HTML({
                 content: `<svg id="graphEdges" width="100%" height="600" style="position:absolute; top:0; left:0;">
-                            <defs>
-                                <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto">
-                                    <path d="M0,0 L10,5 L0,10 Z" fill="black" />
-                                </marker>
-                            </defs>
                           </svg>`
             });
             oVBox.addItem(oEdgeHTML);
 
-            // Helper: intersect line with rectangle
+            let svg = null;
+            const lineElements = [];
+
             function intersectRect(cx, cy, w, h, dx, dy) {
                 const halfW = w / 2, halfH = h / 2;
                 const tX = dx !== 0 ? halfW / Math.abs(dx) : Infinity;
@@ -35,230 +41,212 @@ sap.ui.define([
                 return { x: cx + dx * t, y: cy + dy * t };
             }
 
-            try {
-                // Fetch nodes from OData V4
-                const oModel = this.getOwnerComponent().getModel("nodeModel");
-                const oListBinding = oModel.bindList("/ZKC_CV_NODE", undefined, undefined, undefined, { $$groupId: "$direct" });
-                const edgeListBindng = oModel.bindList("/ZKC_CV_EDGE");
-                const edgeContexts = await edgeListBindng.requestContexts();
+            nodes.forEach((node, index) => {
+                node.x = 100 + index * 150;
+                node.y = 200 + (index % 2) * 100;
+            });
 
-                const aEdges = edgeContexts.map(ctx => ctx.getObject());
-                var edges = [];
-                aEdges.forEach((edge) => {
-                    edges.push([edge.ZFrom -1, edge.ZTo -1]);
-                })
-                const aContexts = await oListBinding.requestContexts();
-
-                if (!Array.isArray(aContexts) || aContexts.length === 0) {
-                    console.error("No nodes fetched from OData");
-                    return;
-                }
-
-                // Convert contexts to JSON objects
-                const nodes = aContexts.map(ctx => ctx.getObject());
-
-                // Assign default positions if needed
-                nodes.forEach((node, index) => {
-                    node.x = 100 + index * 150;
-                    node.y = 200 + (index % 2) * 100;
+            // Create node buttons
+            nodes.forEach((node) => {
+                const oButton = new Button({
+                    text: node.ZLabel,
+                    press: async () => {
+                        this.oDialog ??= await this.loadFragment({ name: "ui5.walkthrough.view.HelloDialog" });
+                        const oText = this.oDialog.getContent()[1];
+                        oText.setText(node.Description);
+                        this.oDialog.open();
+                    }
                 });
+                node.button = oButton;
+                oVBox.addItem(oButton);
 
-                // Create buttons for each node
-                nodes.forEach((node, index) => {
-                    const oButton = new Button({
-                        text: node.ZLabel,
-                        press: async () => {
-                            this.oDialog ??= await this.loadFragment({
-                                name: "ui5.walkthrough.view.HelloDialog"
-                            });
-                            const oText = this.oDialog.getContent()[1];
-                            oText.setText(node.Description);
-                            this.oDialog.open();
-                        }
-                    });
 
-                    node.button = oButton;
-                    oVBox.addItem(oButton);
+               
+                    
+                   
+            });
 
-                    // Dragging
-                    const dragData = { dragging: false, offsetX: 0, offsetY: 0 };
-                    oButton.attachBrowserEvent("mousedown", (e) => {
-                        dragData.dragging = true;
-                        dragData.offsetX = e.clientX - node.x;
-                        dragData.offsetY = e.clientY - node.y;
-                    });
-                    document.addEventListener("mousemove", (e) => {
-                        if (dragData.dragging) {
-                            node.x = e.clientX - dragData.offsetX;
-                            node.y = e.clientY - dragData.offsetY;
-                            updatePositions();
-                        }
-                    });
-                    document.addEventListener("mouseup", () => { dragData.dragging = false; });
-                });
-
-                // SVG lines
-                let svg = null;
-                oEdgeHTML.addEventDelegate({
-                    onAfterRendering: function () {
-                        svg = document.getElementById("graphEdges");
-                        updatePositions();
+            function updatePositions() {
+                nodes.forEach((node) => {
+                    const dom = node.button.getDomRef();
+                    if (dom) {
+                        dom.style.position = "absolute";
+                        dom.style.left = node.x + "px";
+                        dom.style.top = node.y + "px";
                     }
                 });
 
-                const lineElements = [];
+                if (!svg) return;
 
-                function updatePositions() {
-                    // Update button positions
-                    nodes.forEach(function (node) {
-                        const dom = node.button.getDomRef();
-                        if (dom) {
-                            dom.style.position = "absolute";
-                            dom.style.left = node.x + "px";
-                            dom.style.top = node.y + "px";
-                        }
-                    });
+                // Clear existing lines and markers
+                svg.innerHTML = "<defs></defs>";
+                const defs = svg.querySelector("defs");
 
-                    if (!svg) return;
-                    svg.innerHTML = '<defs>' +
-                                    '<marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="5" orient="auto">' +
-                                    '<path d="M0,0 L10,5 L0,10 Z" fill="black" />' +
-                                    '</marker>' +
-                                    '</defs>';
+                edges.forEach((e, idx) => {
+                    const n1 = nodes[e[0]], n2 = nodes[e[1]];
+                    const w1 = n1.button.getDomRef().offsetWidth;
+                    const h1 = n1.button.getDomRef().offsetHeight;
+                    const w2 = n2.button.getDomRef().offsetWidth;
+                    const h2 = n2.button.getDomRef().offsetHeight;
 
+                    const x1c = n1.x + w1 / 2, y1c = n1.y + h1 / 2;
+                    const x2c = n2.x + w2 / 2, y2c = n2.y + h2 / 2;
+                    const dx = x2c - x1c, dy = y2c - y1c;
+                    const offset = -5;
 
-                    edges.forEach(function (e, idx) {
-                        const n1 = nodes[e[0]], n2 = nodes[e[1]];
+                    const start = intersectRect(x1c, y1c, w1, h1, dx, dy);
+                    const end = intersectRect(x2c, y2c, w2, h2, -dx, -dy);
+                    const length = Math.sqrt(dx * dx + dy * dy);
+                    const ux = dx / length, uy = dy / length;
 
-                        const w1 = n1.button.getDomRef().offsetWidth;
-                        const h1 = n1.button.getDomRef().offsetHeight;
-                        const w2 = n2.button.getDomRef().offsetWidth;
-                        const h2 = n2.button.getDomRef().offsetHeight;
+                    const finalStart = { x: start.x + ux * offset, y: start.y + uy * offset };
+                    const finalEnd = { x: end.x - ux * offset, y: end.y - uy * offset };
 
-                        const x1c = n1.x + w1 / 2;
-                        const y1c = n1.y + h1 / 2;
-                        const x2c = n2.x + w2 / 2;
-                        const y2c = n2.y + h2 / 2;
+                    // Create marker per edge
+                    const markerId = `arrow${idx}`;
+                    const marker = document.createElementNS("http://www.w3.org/2000/svg","marker");
+                    marker.setAttribute("id", markerId);
+                    marker.setAttribute("markerWidth", "10");
+                    marker.setAttribute("markerHeight", "10");
+                    marker.setAttribute("refX", "10");
+                    marker.setAttribute("refY", "5");
+                    marker.setAttribute("orient", "auto");
+                    marker.setAttribute("markerUnits", "userSpaceOnUse");
 
-                        const dx = x2c - x1c;
-                        const dy = y2c - y1c;
+                    const path = document.createElementNS("http://www.w3.org/2000/svg","path");
+                    path.setAttribute("d","M0,0 L10,5 L0,10 Z");
+                    path.setAttribute("fill","black");
+                    marker.appendChild(path);
+                    defs.appendChild(marker);
 
-                        const start = intersectRect(x1c, y1c, w1, h1, dx, dy);
-                        const end = intersectRect(x2c, y2c, w2, h2, -dx, -dy);
+                    // Create the line
+                    const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+                    line.setAttribute("x1", finalStart.x);
+                    line.setAttribute("y1", finalStart.y);
+                    line.setAttribute("x2", finalEnd.x);
+                    line.setAttribute("y2", finalEnd.y);
+                    line.setAttribute("stroke","black");
+                    line.setAttribute("stroke-width","4");
+                    line.setAttribute("marker-end",`url(#${markerId})`);
+                    svg.appendChild(line);
 
-                        const markerId = "arrow" + idx;
-                        const defs = svg.querySelector("defs");
-                        const marker = document.createElementNS("http://www.w3.org/2000/svg","marker");
-                        marker.setAttribute("id", markerId);
-                        marker.setAttribute("markerWidth", "10");
-                        marker.setAttribute("markerHeight", "10");
-                        marker.setAttribute("refX", "10");
-                        marker.setAttribute("refY", "5");
-                        marker.setAttribute("orient", "auto");
-                        const path = document.createElementNS("http://www.w3.org/2000/svg","path");
-                        path.setAttribute("d","M0,0 L10,5 L0,10 Z");
-                        path.setAttribute("fill","black");
-                        marker.appendChild(path);
-                        defs.appendChild(marker);
-
-                        const line = document.createElementNS("http://www.w3.org/2000/svg","line");
-                        line.setAttribute("x1", start.x);
-                        line.setAttribute("y1", start.y);
-                        line.setAttribute("x2", end.x);
-                        line.setAttribute("y2", end.y);
-                        line.setAttribute("stroke","black");
-                        line.setAttribute("stroke-width","3");
-                        line.setAttribute("marker-end","url(#" + markerId + ")");
-                        svg.appendChild(line);
-
-                        line.addEventListener("click", function() {
-        lineElements.forEach(le => {
-            le.line.setAttribute("stroke", "black");
-            le.path.setAttribute("fill", "black");
-        });
-
-        line.setAttribute("stroke", "blue");
-        path.setAttribute("fill", "blue");
-    });
-
-    lineElements.push({ line, path });
-                    });
-                }
-
-              
-                const inputSource = new Input({ placeholder: "{i18n>sourceNodePlaceholder}" });
-                const inputTarget = new Input({ placeholder: "{i18n>targetNodePlaceholder}" });
-                const addButton = new Button({
-                    text: "{i18n>addEdgeButton}",
-                    press: function () {
-                        const srcLabel = inputSource.getValue().trim();
-                        const tgtLabel = inputTarget.getValue().trim();
-                        if (!srcLabel || !tgtLabel) return;
-                        const srcIndex = nodes.findIndex(n => n.ZLabel === srcLabel);
-                        const tgtIndex = nodes.findIndex(n => n.ZLabel === tgtLabel);
-                        if (edges.some(edge => edge[0] === srcIndex && edge[1] === tgtIndex)) {
-                            alert("This edge already exists");
-                        } else if (srcIndex !== -1 && tgtIndex !== -1) {
-                            edges.push([srcIndex, tgtIndex]);
-                            edgeListBindng.create({
-                                ZFrom: srcIndex + 1,
-                                ZTo: tgtIndex + 1
-                            })
-                            oModel.submitBatch("$auto");
-                            updatePositions();
-                        } else {
-                            alert("Invalid node labels");
-                        }
-                    }
-                });
-                const deleteButton = new Button({
-                    text: "{i18n>deleteEdgeButton}",
-                    press: function () {
-                        const srcLabel = inputSource.getValue().trim();
-                        const tgtLabel = inputTarget.getValue().trim();
-                        const srcIndex = nodes.findIndex(n => n.ZLabel === srcLabel);
-                        const tgtIndex = nodes.findIndex(n => n.ZLabel === tgtLabel);
-                        const edgeIndex = edges.findIndex(e => e[0] === srcIndex && e[1] === tgtIndex);
-                        if (edgeIndex !== -1) {
-                            edges.splice(edgeIndex, 1);
-                            var edgeContext = edgeContexts[edgeIndex];
-                            edgeContext.delete();
-                            updatePositions();
-                        } else {
-                            alert("This connection doesn't exist");
-                        }
-                    }
-                });
-                const inputSearch = new Input({ placeholder: "{i18n>searchInputText}" });
-                const searchButton = new Button({
-                    text: "{i18n>searchNodeButtonText}",
-                    press: function () {
-                        const searchLabel = inputSearch.getValue().trim();
-                        nodes.forEach(function (n) {
-                            n.button.setType(n.ZLabel === searchLabel ? "Success" : "Default");
+                    // Click event updates line and arrow color
+                    line.addEventListener("click", (event) => {
+                        event.stopPropagation();
+                        lineElements.forEach(le => {
+                            le.line.setAttribute("stroke","black");
+                            le.path.setAttribute("fill","black");
                         });
-                        setTimeout(updatePositions, 0);
-                    }
-                });
-                const inputBox = new HBox({
-                    items: [inputSource, inputTarget, addButton, deleteButton,new VBox({width: "20%"}) , inputSearch, searchButton],
-                    justifyContent: "Center",
-                    alignItems: "Center",
-                    width: "100%",
-                    fitContainer: true,
-                    class: "sapUiMediumMarginBegin"
-                });
-                oVBox.addItem(inputBox);
+                        line.setAttribute("stroke","blue");
+                        path.setAttribute("fill","blue");
+                    });
 
-            } catch (err) {
-                console.error("Error fetching nodes from OData:", err);
+                    lineElements.push({ line, path });
+                });
             }
+
+            oEdgeHTML.addEventDelegate({
+                onAfterRendering: function () {
+                    svg = document.getElementById("graphEdges");
+                    updatePositions();
+                }
+            });
+
+            oVBox.addEventDelegate({
+                onclick: (event) => {
+                    const target = event.target;
+                    const isNodeButton = nodes.some(n => n.button.getDomRef() === target || n.button.getDomRef().contains(target));
+                    const isEdge = lineElements.some(le => le.line === target);
+                    if (!isNodeButton && !isEdge) {
+                        nodes.forEach(n => n.button.setType("Default"));
+                        lineElements.forEach(le => {
+                            le.line.setAttribute("stroke","black");
+                            le.path.setAttribute("fill","black");
+                        });
+                         setTimeout(updatePositions, 0);
+
+                    }
+                }
+            });
+
+            // Inputs and buttons
+            const inputSource = new Input({ placeholder: "{i18n>sourceNodePlaceholder}" });
+            const inputTarget = new Input({ placeholder: "{i18n>targetNodePlaceholder}" });
+            const inputSearch = new Input({ placeholder: "{i18n>searchInputText}" });
+
+            const addButton = new Button({
+                text: "{i18n>addEdgeButton}",
+                press: () => {
+                    const srcLabel = inputSource.getValue().trim();
+                    const tgtLabel = inputTarget.getValue().trim();
+                    const srcIndex = nodes.findIndex(n => n.ZLabel === srcLabel);
+                    const tgtIndex = nodes.findIndex(n => n.ZLabel === tgtLabel);
+
+                    if (!srcLabel || !tgtLabel) return;
+                    if (edges.some(e => e[0] === srcIndex && e[1] === tgtIndex)) {
+                        MessageBox.error("This connection already exists!");
+                    } else if (srcIndex !== -1 && tgtIndex !== -1) {
+                        edges.push([srcIndex, tgtIndex]);
+                        updatePositions();
+                        MessageToast.show("✅ Connection added!", { duration: 3000 });
+                    } else {
+                        MessageBox.error("Invalid node labels!");
+                    }
+                }
+            });
+
+            const deleteButton = new Button({
+                text: "{i18n>deleteEdgeButton}",
+                press: () => {
+                    const srcLabel = inputSource.getValue().trim();
+                    const tgtLabel = inputTarget.getValue().trim();
+                    const srcIndex = nodes.findIndex(n => n.ZLabel === srcLabel);
+                    const tgtIndex = nodes.findIndex(n => n.ZLabel === tgtLabel);
+                    const edgeIndex = edges.findIndex(e => e[0] === srcIndex && e[1] === tgtIndex);
+
+                    if (edgeIndex !== -1) {
+                        edges.splice(edgeIndex, 1);
+                        updatePositions();
+                        MessageToast.show("✅ Connection removed!", { duration: 3000 });
+                    } else {
+                        MessageBox.error("This connection doesn't exist!");
+                    }
+                }
+            });
+
+            const searchButton = new Button({
+                text: "{i18n>searchNodeButtonText}",
+                press: () => {
+                    const searchLabel = inputSearch.getValue().trim();
+                    let found = false;
+                    nodes.forEach(n => {
+                        if (n.ZLabel === searchLabel) {
+                            found = true;
+                            n.button.setType("Emphasized");
+                        } else {
+                            n.button.setType("Default");
+                        }
+                    });
+                     setTimeout(updatePositions, 0);
+
+                    MessageToast.show(found ? "✅ Node found!" : "❌ Node not found!", { duration: 3000 });
+                }
+            });
+
+            const inputBox = new HBox({
+                items: [inputSource, inputTarget, addButton, deleteButton, new VBox({ width: "20%" }), inputSearch, searchButton],
+                justifyContent: "Center",
+                alignItems: "Center",
+                width: "100%",
+                fitContainer: true,
+                class: "sapUiMediumMarginBegin"
+            });
+
+            oVBox.addItem(inputBox);
         },
 
         async onDialogOpen() {
-            this.oDialog ??= await this.loadFragment({
-                name: "ui5.walkthrough.view.HelloDialog"
-            });
+            this.oDialog ??= await this.loadFragment({ name: "ui5.walkthrough.view.HelloDialog" });
             this.oDialog.open();
         },
 
