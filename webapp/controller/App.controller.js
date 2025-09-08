@@ -81,7 +81,7 @@ sap.ui.define([
     const yBase = 200;       // base Y position
 
     nodes.forEach((node, idx) => {
-        // Assign a stable random vertical offset once per node
+        // Assign a random vertical offset once per node
         if (node.yOffsetRandom === undefined) {
             node.yOffsetRandom = (Math.random() - 0.5) * 60; // +/- 30 px
         }
@@ -136,35 +136,42 @@ sap.ui.define([
     const defs = svg.querySelector("defs");
     lineElements.length = 0; // Clear old references
 
+     // --- Iterate through edges and draw connections ---
     edges.forEach((e, idx) => {
         const srcIdx = e[0];
         const tgtIdx = e[1];
         const n1 = nodes[srcIdx];
         const n2 = nodes[tgtIdx];
 
+ // Get width/height of source and target buttons
         const w1 = n1.button.getDomRef().offsetWidth;
         const h1 = n1.button.getDomRef().offsetHeight;
         const w2 = n2.button.getDomRef().offsetWidth;
         const h2 = n2.button.getDomRef().offsetHeight;
 
+        // Calculate center points of source & target nodes
         const x1c = n1.x + w1 / 2,
               y1c = n1.y + h1 / 2,
               x2c = n2.x + w2 / 2,
               y2c = n2.y + h2 / 2;
 
+              // Delta vector between source and target
         const dx = x2c - x1c,
               dy = y2c - y1c,
               offset = -5;
-
+        // Calculate intersection points of line with node rectangles
         const start = intersectRect(x1c, y1c, w1, h1, dx, dy);
         const end = intersectRect(x2c, y2c, w2, h2, -dx, -dy);
+
+         // Normalize direction vector
         const length = Math.sqrt(dx * dx + dy * dy);
         const ux = dx / length, uy = dy / length;
 
+         // Shift line slightly inward so it doesn’t overlap node borders
         const finalStart = { x: start.x + ux * offset, y: start.y + uy * offset };
         const finalEnd = { x: end.x - ux * offset, y: end.y - uy * offset };
 
-        // Create marker and path
+          // --- Define arrow marker for this edge ---
         const markerId = `arrow${idx}`;
         const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
         marker.setAttribute("id", markerId);
@@ -176,7 +183,7 @@ sap.ui.define([
         marker.setAttribute("markerUnits", "userSpaceOnUse");
 
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", "M0,0 L10,5 L0,10 Z");
+        path.setAttribute("d", "M0,0 L10,5 L0,10 Z"); // Triangle arrow shape
         path.setAttribute("fill", defaultArrowColor);
         marker.appendChild(path);
         defs.appendChild(marker);
@@ -277,6 +284,7 @@ sap.ui.define([
             const inputTarget = new Input({ placeholder: "{i18n>targetNodePlaceholder}" });
             const inputSearch = new Input({ placeholder: "{i18n>searchInputText}" });
 
+            // Adding a new edge
             const addButton = new Button({
                 text: "{i18n>addEdgeButton}",
                 press: () => {
@@ -306,6 +314,8 @@ sap.ui.define([
                 }
             });
 
+
+            //Deleting an existing edge
             const deleteButton = new Button({
                 text: "{i18n>deleteEdgeButton}",
                 press: () => {
@@ -330,11 +340,14 @@ sap.ui.define([
                 }
             });
 
+
+
+            //Highlighting a node
             const searchButton = new Button({
                 text: "{i18n>searchNodeButtonText}",
                 press: () => {
                     const searchLabel = inputSearch.getValue().trim();
-                    let found = false;
+                    var found = false;
                     nodes.forEach(n => {
                         if (n.ZLabel === searchLabel) {
                             found = true;
@@ -348,6 +361,8 @@ sap.ui.define([
                 }
             });
 
+
+            //Container for the inputs and buttons
             const inputBox = new HBox({
                 items: [inputSource, inputTarget, addButton, deleteButton, new VBox({ width: "20%" }), inputSearch, searchButton],
                 justifyContent: "Center",
