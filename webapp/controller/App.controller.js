@@ -93,13 +93,26 @@ sap.ui.define([
 
 
             // Intersection calculation
-            function intersectRect(cx, cy, w, h, dx, dy) {
-                const halfW = w / 2, halfH = h / 2;
-                const tX = dx !== 0 ? halfW / Math.abs(dx) : Infinity;
-                const tY = dy !== 0 ? halfH / Math.abs(dy) : Infinity;
-                const t = Math.min(tX, tY);
-                return { x: cx + dx * t, y: cy + dy * t };
-            }
+            function shortenLine(x1, y1, x2, y2, margin) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const length = Math.sqrt(dx * dx + dy * dy);
+
+    if (length === 0) {
+        // Avoid division by zero if nodes overlap
+        return { start: { x: x1, y: y1 }, end: { x: x2, y: y2 } };
+    }
+
+    // Normalized direction vector
+    const ux = dx / length;
+    const uy = dy / length;
+
+    return {
+        start: { x: x1 + ux * margin, y: y1 + uy * margin },
+        end:   { x: x2 - ux * margin, y: y2 - uy * margin }
+    };
+}
+
 
             // Create node buttons
             nodes.forEach((node) => {
@@ -118,9 +131,9 @@ sap.ui.define([
 
             // Draw nodes + edges
            function updatePositions() {
-    layoutNodesHorizontal(); // Position nodes horizontally
+    layoutNodesHorizontal(); // Step 1: position nodes
 
-    // Update node button positions
+    // --- Step 2: place node buttons ---
     nodes.forEach((node) => {
         const dom = node.button.getDomRef();
         if (dom) {
@@ -132,46 +145,31 @@ sap.ui.define([
 
     if (!svg) return;
 
-    svg.innerHTML = "<defs></defs>"; // Clear previous lines & markers
+    // --- Step 3: clear old edges ---
+    svg.innerHTML = "<defs></defs>";
     const defs = svg.querySelector("defs");
-    lineElements.length = 0; // Clear old references
+    lineElements.length = 0;
 
-     // --- Iterate through edges and draw connections ---
+    // --- Step 4: draw each edge ---
     edges.forEach((e, idx) => {
-        const srcIdx = e[0];
-        const tgtIdx = e[1];
-        const n1 = nodes[srcIdx];
-        const n2 = nodes[tgtIdx];
+        const n1 = nodes[e[0]];
+        const n2 = nodes[e[1]];
 
- // Get width/height of source and target buttons
         const w1 = n1.button.getDomRef().offsetWidth;
         const h1 = n1.button.getDomRef().offsetHeight;
         const w2 = n2.button.getDomRef().offsetWidth;
         const h2 = n2.button.getDomRef().offsetHeight;
 
-        // Calculate center points of source & target nodes
+        // Use node centers
         const x1c = n1.x + w1 / 2,
               y1c = n1.y + h1 / 2,
               x2c = n2.x + w2 / 2,
               y2c = n2.y + h2 / 2;
 
-              // Delta vector between source and target
-        const dx = x2c - x1c,
-              dy = y2c - y1c,
-              offset = -5;
-        // Calculate intersection points of line with node rectangles
-        const start = intersectRect(x1c, y1c, w1, h1, dx, dy);
-        const end = intersectRect(x2c, y2c, w2, h2, -dx, -dy);
+        // Shorten line by 10px margin from each node center
+        const { start: finalStart, end: finalEnd } = shortenLine(x1c, y1c, x2c, y2c, 15);
 
-         // Normalize direction vector
-        const length = Math.sqrt(dx * dx + dy * dy);
-        const ux = dx / length, uy = dy / length;
-
-         // Shift line slightly inward so it doesn’t overlap node borders
-        const finalStart = { x: start.x + ux * offset, y: start.y + uy * offset };
-        const finalEnd = { x: end.x - ux * offset, y: end.y - uy * offset };
-
-          // --- Define arrow marker for this edge ---
+        // --- Define arrow marker ---
         const markerId = `arrow${idx}`;
         const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
         marker.setAttribute("id", markerId);
@@ -183,12 +181,12 @@ sap.ui.define([
         marker.setAttribute("markerUnits", "userSpaceOnUse");
 
         const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-        path.setAttribute("d", "M0,0 L10,5 L0,10 Z"); // Triangle arrow shape
+        path.setAttribute("d", "M0,0 L10,5 L0,10 Z"); // triangle
         path.setAttribute("fill", defaultArrowColor);
         marker.appendChild(path);
         defs.appendChild(marker);
 
-        // Draw forward arrow
+        // --- Draw forward arrow ---
         const lineForward = document.createElementNS("http://www.w3.org/2000/svg", "line");
         lineForward.setAttribute("x1", finalStart.x);
         lineForward.setAttribute("y1", finalStart.y);
@@ -199,9 +197,9 @@ sap.ui.define([
         lineForward.setAttribute("marker-end", `url(#${markerId})`);
         svg.appendChild(lineForward);
 
-        // Draw backward arrow only if reverse edge exists
+        // --- Draw backward arrow if reverse exists ---
         let lineBackward = null;
-        const reverseEdgeIndex = edges.findIndex(edge => edge[0] === tgtIdx && edge[1] === srcIdx);
+        const reverseEdgeIndex = edges.findIndex(edge => edge[0] === e[1] && edge[1] === e[0]);
         if (reverseEdgeIndex !== -1) {
             lineBackward = document.createElementNS("http://www.w3.org/2000/svg", "line");
             lineBackward.setAttribute("x1", finalEnd.x);
@@ -214,7 +212,7 @@ sap.ui.define([
             svg.appendChild(lineBackward);
         }
 
-        // Highlight both lines on click
+        // --- Highlight logic ---
         const updateHighlight = () => {
             lineElements.forEach(le => {
                 le.lineForward.setAttribute("stroke", defaultLineColor);
